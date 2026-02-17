@@ -15,7 +15,6 @@ with app.app_context():
     db.create_all()
 
 # ========== HOSPITAL CRUD ==========
-
 @app.route("/hospitals", methods=["POST"])
 def create_hospital():
     data = request.json
@@ -77,7 +76,6 @@ def delete_hospital(hospital_id):
     return jsonify({"message": "Hospital deleted"}), 200
 
 # ========== USER ROLE CRUD ==========
-
 @app.route("/roles", methods=["POST"])
 def create_role():
     data = request.json
@@ -102,15 +100,6 @@ def get_roles():
         "description": r.description
     } for r in roles])
 
-@app.route("/roles/<int:role_id>", methods=["GET"])
-def get_role(role_id):
-    role = UserRole.query.get_or_404(role_id)
-    return jsonify({
-        "role_id": role.role_id,
-        "role_name": role.role_name,
-        "description": role.description
-    })
-
 @app.route("/roles/<int:role_id>", methods=["PUT"])
 def update_role(role_id):
     role = UserRole.query.get_or_404(role_id)
@@ -124,15 +113,7 @@ def update_role(role_id):
         "description": role.description
     })
 
-@app.route("/roles/<int:role_id>", methods=["DELETE"])
-def delete_role(role_id):
-    role = UserRole.query.get_or_404(role_id)
-    db.session.delete(role)
-    db.session.commit()
-    return jsonify({"message": "Role deleted"}), 200
-
 # ========== USER CRUD ==========
-
 @app.route("/users", methods=["POST"])
 def create_user():
     data = request.json
@@ -206,7 +187,6 @@ def delete_user(user_id):
     return jsonify({"message": "User deleted"}), 200
 
 # ========== PATIENT CRUD ==========
-
 @app.route("/patients", methods=["POST"])
 def create_patient():
     data = request.json
@@ -284,7 +264,6 @@ def delete_patient(patient_id):
     return jsonify({"message": "Patient deleted"}), 200
 
 # ========== ENCOUNTER CRUD ==========
-
 @app.route("/encounters", methods=["POST"])
 def create_encounter():
     data = request.json
@@ -518,6 +497,19 @@ def delete_prescription(prescription_id):
 @app.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "healthy"}), 200
+
+# Return all endpoints
+@app.route("/endpoints", methods=["GET"])
+def list_endpoints():
+    endpoints = []
+    for rule in app.url_map.iter_rules():
+        endpoints.append({
+            "endpoint": rule.endpoint,
+            "methods": list(rule.methods),
+            "path": str(rule)
+        })
+    return jsonify(endpoints), 200
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5002, debug=True)
