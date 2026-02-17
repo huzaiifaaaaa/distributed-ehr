@@ -1,0 +1,800 @@
+{
+  "info": {
+    "_postman_id": "e34cdb2e-ca72-4299-a0fd-1f83ae2c242e",
+    "name": "EHR",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "45457587",
+    "_collection_link": "https://go.postman.co/collection/45457587-e34cdb2e-ca72-4299-a0fd-1f83ae2c242e?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Hospital",
+      "item": [
+        {
+          "name": "Create Hospital",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Oulu Central Hospital\",\n  \"location\": \"Oulu, Finland\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "hospitals"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Hospital",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "hospitals",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Hospitals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "hospitals"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Hospital",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "hospitals",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Hospital",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "hospitals",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Roles",
+          "item": [
+            {
+              "name": "Create Role",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role_name\": \"Doctor\",\n  \"description\": \"Doctor\"\n}\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{BASE_URL}}/roles",
+                  "host": [
+                    "{{BASE_URL}}"
+                  ],
+                  "path": [
+                    "roles"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Edit Role",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{BASE_URL}}/roles/1",
+                  "host": [
+                    "{{BASE_URL}}"
+                  ],
+                  "path": [
+                    "roles",
+                    "1"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Roles",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{BASE_URL}}/roles",
+                  "host": [
+                    "{{BASE_URL}}"
+                  ],
+                  "path": [
+                    "roles"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hospital_id\": 2,\n  \"full_name\": \"john doe\",\n  \"email\": \"johndoe@hospital2.com\",\n  \"password\":\"12345\",\n  \"role_id\": 1\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/users",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit User",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/users/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/users",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/users/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/users/2",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users",
+                "2"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Patient",
+      "item": [
+        {
+          "name": "Create Patient",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"John Doe\",\n  \"date_of_birth\": \"1990-05-15\",\n  \"gender\": \"male\",\n  \"phone\": \"+358401234567\",\n  \"address\": \"Oulu, Finland\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/patients",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "patients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Patient",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"John Doe\",\n  \"date_of_birth\": \"1990-05-15\",\n  \"gender\": \"male\",\n  \"phone\": \"+358401234562\",\n  \"address\": \"Oulu, Finland\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/patients/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "patients",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/patients",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "patients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patient",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/patients/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "patients",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Patient",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/hospitals/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "hospitals",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Encounter",
+      "item": [
+        {
+          "name": "Create Encounter",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": 1,\n  \"doctor_id\": 2,\n  \"hospital_id\": 1,\n  \"visit_type\": \"outpatient\",\n  \"visit_reason\": \"Fever and headache\",\n  \"visit_date\": \"2026-02-17T10:30:00\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/encounters",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "encounters"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Encounter",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": 1,\n  \"doctor_id\": 2,\n  \"hospital_id\": 1,\n  \"visit_type\": \"outpatient\",\n  \"visit_reason\": \"Fever, headache\",\n  \"visit_date\": \"2026-02-17T10:30:00\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/encounters/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "encounters",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Encounters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/encounters",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "encounters"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Encounter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/encounters/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "encounters",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Encounter",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/encounters/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "encounters",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Observations",
+      "item": [
+        {
+          "name": "Create Observation",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"encounter_id\": 1,\n  \"patient_id\": 1,\n  \"type\": \"blood_pressure\",\n  \"value\": \"120/80\",\n  \"unit\": \"mmHg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/observations",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "observations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Observation",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"encounter_id\": 1,\n  \"patient_id\": 1,\n  \"type\": \"blood_pressure\",\n  \"value\": \"120/84\",\n  \"unit\": \"mmHg\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/observations/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "observations",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Observations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/observations",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "observations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Observation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/observations/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "observations",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Observation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/observations/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "observations",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Prescription",
+      "item": [
+        {
+          "name": "Create Prescription",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"encounter_id\": 1,\n  \"patient_id\": 1,\n  \"doctor_id\": 2,\n  \"medication\": \"Paracetamol\",\n  \"dosage\": \"500 mg\",\n  \"frequency\": \"Twice daily\",\n  \"duration\": \"5 days\",\n  \"notes\": \"Take after food\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/prescriptions",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "prescriptions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Prescription",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"encounter_id\": 1,\n  \"patient_id\": 1,\n  \"doctor_id\": 2,\n  \"medication\": \"Paracetamol\",\n  \"dosage\": \"500 mg\",\n  \"frequency\": \"Twice daily\",\n  \"duration\": \"10 days\",\n  \"notes\": \"Take after food\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/prescriptions/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "prescriptions",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Prescriptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/prescriptions",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "prescriptions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Prescription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/prescriptions/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "prescriptions",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Prescription",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/observations/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "observations",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"full_name\": \"John Doe\",\n  \"date_of_birth\": \"1990-05-15\",\n  \"gender\": \"male\",\n  \"phone\": \"+358401234567\",\n  \"address\": \"Oulu, Finland\"\n}\n"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/health",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Endpoints",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"full_name\": \"John Doe\",\n  \"date_of_birth\": \"1990-05-15\",\n  \"gender\": \"male\",\n  \"phone\": \"+358401234567\",\n  \"address\": \"Oulu, Finland\"\n}\n"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/endpoints",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "endpoints"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

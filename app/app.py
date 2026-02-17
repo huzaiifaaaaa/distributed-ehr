@@ -338,7 +338,6 @@ def delete_encounter(encounter_id):
     return jsonify({"message": "Encounter deleted"}), 200
 
 # ========== OBSERVATION CRUD ==========
-
 @app.route("/observations", methods=["POST"])
 def create_observation():
     data = request.json
@@ -409,7 +408,6 @@ def delete_observation(observation_id):
     return jsonify({"message": "Observation deleted"}), 200
 
 # ========== PRESCRIPTION CRUD ==========
-
 @app.route("/prescriptions", methods=["POST"])
 def create_prescription():
     data = request.json
