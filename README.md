@@ -80,9 +80,7 @@ All endpoints return JSON. Base URL: `http://localhost:5002`
 ### User Roles
 - `POST /roles` - Create role
 - `GET /roles` - List all roles
-- `GET /roles/<id>` - Get role by ID
 - `PUT /roles/<id>` - Update role
-- `DELETE /roles/<id>` - Delete role
 
 ### Users
 - `POST /users` - Create user
@@ -145,6 +143,10 @@ curl -X POST http://localhost:5002/patients \
 ```bash
 curl http://localhost:5002/users
 ```
+
+
+### Postman Collection
+`https://huzaifa-2937241.postman.co/workspace/distributed-ehr~13c9bc0a-9e39-4b8c-83c4-29342ae61aa7/collection/45457587-e34cdb2e-ca72-4299-a0fd-1f83ae2c242e?action=share&creator=45457587&active-environment=45457587-7116d4eb-5b83-4bf3-b6b7-b484b6fa2db5`
 
 ## Security Features
 
@@ -244,15 +246,20 @@ docker-compose exec app python seed.py
 
 ```
 distributed-ehr/
-├── app.py              # Main Flask application with API routes
-├── database.py         # SQLAlchemy models
-├── config.py           # Configuration settings
-├── encryption.py       # Encryption utilities
-├── seed.py             # Sample data script
-├── requirements.txt    # Python dependencies
-├── Dockerfile          # Docker container definition
-├── docker-compose.yml  # Multi-container orchestration
-└── README.md           # Documentation
+└──app
+   ├── app.py              # Main Flask application with API routes
+   ├── database.py         # SQLAlchemy models
+   ├── config.py           # Configuration settings
+   ├── encryption.py       # Encryption utilities
+   ├── seed.py             # Sample data script
+   ├── requirements.txt    # Python dependencies
+   ├── Dockerfile          # Docker container definition
+   └── docker-compose.yml  # Multi-container orchestration
+└──test
+   └── test_api.py         # app test cases
+└──postman
+   └──EHR.postman_collection.json  #app postman collection     
+└── README.md              # Documentation
 ```
 
 ## Notes
