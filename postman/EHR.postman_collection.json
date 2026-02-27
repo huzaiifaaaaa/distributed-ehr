@@ -795,6 +795,158 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Cluster",
+      "item": [
+        {
+          "name": "List Peers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/cluster/peers",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "cluster",
+                "peers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register Peer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"http://other-node:5002\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/cluster/peers",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "cluster",
+                "peers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Leader",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/cluster/leader",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "cluster",
+                "leader"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Leader",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"http://node1:5002\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/cluster/leader",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "cluster",
+                "leader"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Request Patient From Peer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Cluster-Auth",
+                "value": "{{CLUSTER_AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/cluster/request_patient/1",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "cluster",
+                "request_patient",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Raft Log",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Cluster-Auth",
+                "value": "{{CLUSTER_AUTH_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/cluster/log",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "cluster",
+                "log"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }

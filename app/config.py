@@ -12,3 +12,12 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     JSON_SORT_KEYS = False
+
+    # Cluster settings for inter-node communication and Raft
+    CLUSTER_AUTH_TOKEN = os.environ.get("CLUSTER_AUTH_TOKEN", "dev-cluster-token")
+    # Comma-separated list of peer URLs (e.g. http://node1:5002,http://node2:5002)
+    PEER_URLS = os.environ.get("PEER_URLS", "").split(",") if os.environ.get("PEER_URLS") else []
+    # Current node's URL (used for identifying leader)
+    NODE_URL = os.environ.get("NODE_URL", "http://localhost:5002")
+    # Leader URL; in a real Raft cluster this would be elected
+    LEADER_URL = os.environ.get("LEADER_URL", NODE_URL)

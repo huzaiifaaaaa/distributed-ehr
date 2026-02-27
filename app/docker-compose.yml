@@ -25,6 +25,11 @@ services:
       DATABASE_URL: postgresql://ehr_user:ehr_pass@db:5432/ehr_db
       SECRET_KEY: your-secret-key-change-in-production
       ENCRYPTION_KEY: your-encryption-key-32-bytes!!
+      # cluster settings (optional, for multi-node deployment)
+      # NODE_URL: http://node1:5000
+      # PEER_URLS: http://node2:5000,http://node3:5000
+      # CLUSTER_AUTH_TOKEN: some-shared-secret
+      # LEADER_URL: http://node1:5000
     ports:
       - "5000:5000"
     depends_on:

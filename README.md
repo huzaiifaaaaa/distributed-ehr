@@ -43,6 +43,20 @@ See the [data model diagram](#data-model-diagram) below.
    docker-compose exec app python seed.py
    ```
 
+3. **Cluster example** (run two nodes on different ports):
+   ```bash
+   # node1
+   NODE_URL=http://localhost:5002 LEADER_URL=http://localhost:5002 \
+     PEER_URLS=http://localhost:5003 CLUSTER_AUTH_TOKEN=secret \
+     docker-compose up --build
+
+   # in another shell, node2
+   NODE_URL=http://localhost:5003 PEER_URLS=http://localhost:5002 \
+     CLUSTER_AUTH_TOKEN=secret docker-compose up --build
+   ```
+
+   After both nodes are running you can register peers via `/cluster/peers` or use the environment variable, and manually set the leader or let node1 remain as default.
+
 3. **Access the API**:
    - Base URL: `http://localhost:5002`
    - Health check: `http://localhost:5002/health`
@@ -53,6 +67,9 @@ See the [data model diagram](#data-model-diagram) below.
    ```bash
    pip install -r requirements.txt
    ```
+
+2. **Configure cluster (optional)**: set `NODE_URL`, `PEER_URLS` (comma-separated), and a shared `CLUSTER_AUTH_TOKEN`. The leader can be designated with `LEADER_URL` or changed at runtime via the API.
+
 
 2. **Set up PostgreSQL** and update `DATABASE_URL` in config.py
 
@@ -69,6 +86,17 @@ See the [data model diagram](#data-model-diagram) below.
 ## API Endpoints
 
 All endpoints return JSON. Base URL: `http://localhost:5002`
+### Cluster / Inter-node Endpoints
+- `GET /cluster/peers` - list registered peer node URLs
+- `POST /cluster/peers` - register a peer (body `{ "url": "http://other-node:5002" }`)
+- `GET /cluster/leader` - return current leader URL
+- `POST /cluster/leader` - set the leader manually (body `{ "url": "http://node1:5002" }`)
+- `GET /cluster/request_patient/<id>` - used by peers to fetch patient data (requires header `X-Cluster-Auth` with the shared token)
+- `GET /cluster/log` - retrieve the Raft log of operations (requires cluster auth)
+
+Writes to the cluster must go through the leader. Non-leader nodes forward write requests automatically and the leader replicates changes to all peers via the same REST endpoints with a shared authentication token.
+
+These endpoints are useful for basic inter-node communication and demonstrate a simple Raft-style replication strategy: leader election is manual via `/cluster/leader`, and replication is handled by the leader sending each log entry to peers.
 
 ### Hospital
 - `POST /hospitals` - Create hospital

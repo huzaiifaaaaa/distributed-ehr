@@ -1,9 +1,52 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort, current_app
 from database import db, Hospital, UserRole, User, Patient, Encounter, Observation, Prescription
 from config import Config
 from encryption import Encryptor, hash_password
 from datetime import datetime
 import uuid
+
+# cluster communication utilities
+from cluster import (
+    is_leader,
+    forward_to_leader,
+    replicate_to_peers,
+    check_cluster_auth,
+    register_peer,
+    set_leader,
+    append_log,
+    get_log
+)
+
+
+# decorator to ensure write operations go through leader
+
+def leader_required(func):
+    def wrapper(*args, **kwargs):
+        # if request came from cluster peer, skip forwarding and log
+        if request.headers.get("X-Cluster-Auth") == current_app.config.get("CLUSTER_AUTH_TOKEN"):
+            # record in local log as follower
+            append_log({
+                "method": request.method,
+                "path": request.path,
+                "data": request.json
+            })
+            return func(*args, **kwargs)
+        if not is_leader():
+            # forward request to leader
+            resp = forward_to_leader(request.path, method=request.method, json=request.json)
+            return (resp.content, resp.status_code, resp.headers.items())
+        # if leader, append to log then perform operation and replicate
+        entry = {"method": request.method, "path": request.path, "data": request.json}
+        append_log(entry)
+        result = func(*args, **kwargs)
+        # replicate after commit
+        try:
+            replicate_to_peers(request.path, method=request.method, json=request.json)
+        except Exception:
+            pass
+        return result
+    wrapper.__name__ = func.__name__
+    return wrapper
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -16,6 +59,7 @@ with app.app_context():
 
 # ========== HOSPITAL CRUD ==========
 @app.route("/hospitals", methods=["POST"])
+@leader_required
 def create_hospital():
     data = request.json
     hospital = Hospital(
@@ -55,6 +99,7 @@ def get_hospital(hospital_id):
     })
 
 @app.route("/hospitals/<int:hospital_id>", methods=["PUT"])
+@leader_required
 def update_hospital(hospital_id):
     hospital = Hospital.query.get_or_404(hospital_id)
     data = request.json
@@ -69,6 +114,7 @@ def update_hospital(hospital_id):
     })
 
 @app.route("/hospitals/<int:hospital_id>", methods=["DELETE"])
+@leader_required
 def delete_hospital(hospital_id):
     hospital = Hospital.query.get_or_404(hospital_id)
     db.session.delete(hospital)
@@ -77,6 +123,7 @@ def delete_hospital(hospital_id):
 
 # ========== USER ROLE CRUD ==========
 @app.route("/roles", methods=["POST"])
+@leader_required
 def create_role():
     data = request.json
     role = UserRole(
@@ -101,6 +148,7 @@ def get_roles():
     } for r in roles])
 
 @app.route("/roles/<int:role_id>", methods=["PUT"])
+@leader_required
 def update_role(role_id):
     role = UserRole.query.get_or_404(role_id)
     data = request.json
@@ -115,6 +163,7 @@ def update_role(role_id):
 
 # ========== USER CRUD ==========
 @app.route("/users", methods=["POST"])
+@leader_required
 def create_user():
     data = request.json
     user = User(
@@ -163,6 +212,7 @@ def get_user(user_id):
     })
 
 @app.route("/users/<int:user_id>", methods=["PUT"])
+@leader_required
 def update_user(user_id):
     user = User.query.get_or_404(user_id)
     data = request.json
@@ -180,6 +230,7 @@ def update_user(user_id):
     })
 
 @app.route("/users/<int:user_id>", methods=["DELETE"])
+@leader_required
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     db.session.delete(user)
@@ -188,6 +239,7 @@ def delete_user(user_id):
 
 # ========== PATIENT CRUD ==========
 @app.route("/patients", methods=["POST"])
+@leader_required
 def create_patient():
     data = request.json
     patient = Patient(
@@ -237,6 +289,7 @@ def get_patient(patient_id):
     })
 
 @app.route("/patients/<int:patient_id>", methods=["PUT"])
+@leader_required
 def update_patient(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     data = request.json
@@ -257,6 +310,7 @@ def update_patient(patient_id):
     })
 
 @app.route("/patients/<int:patient_id>", methods=["DELETE"])
+@leader_required
 def delete_patient(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     db.session.delete(patient)
@@ -265,6 +319,7 @@ def delete_patient(patient_id):
 
 # ========== ENCOUNTER CRUD ==========
 @app.route("/encounters", methods=["POST"])
+@leader_required
 def create_encounter():
     data = request.json
     encounter = Encounter(
@@ -316,6 +371,7 @@ def get_encounter(encounter_id):
     })
 
 @app.route("/encounters/<int:encounter_id>", methods=["PUT"])
+@leader_required
 def update_encounter(encounter_id):
     encounter = Encounter.query.get_or_404(encounter_id)
     data = request.json
@@ -331,6 +387,7 @@ def update_encounter(encounter_id):
     })
 
 @app.route("/encounters/<int:encounter_id>", methods=["DELETE"])
+@leader_required
 def delete_encounter(encounter_id):
     encounter = Encounter.query.get_or_404(encounter_id)
     db.session.delete(encounter)
@@ -339,6 +396,7 @@ def delete_encounter(encounter_id):
 
 # ========== OBSERVATION CRUD ==========
 @app.route("/observations", methods=["POST"])
+@leader_required
 def create_observation():
     data = request.json
     observation = Observation(
@@ -386,6 +444,7 @@ def get_observation(observation_id):
     })
 
 @app.route("/observations/<int:observation_id>", methods=["PUT"])
+@leader_required
 def update_observation(observation_id):
     observation = Observation.query.get_or_404(observation_id)
     data = request.json
@@ -401,6 +460,7 @@ def update_observation(observation_id):
     })
 
 @app.route("/observations/<int:observation_id>", methods=["DELETE"])
+@leader_required
 def delete_observation(observation_id):
     observation = Observation.query.get_or_404(observation_id)
     db.session.delete(observation)
@@ -409,6 +469,7 @@ def delete_observation(observation_id):
 
 # ========== PRESCRIPTION CRUD ==========
 @app.route("/prescriptions", methods=["POST"])
+@leader_required
 def create_prescription():
     data = request.json
     prescription = Prescription(
@@ -468,6 +529,7 @@ def get_prescription(prescription_id):
     })
 
 @app.route("/prescriptions/<int:prescription_id>", methods=["PUT"])
+@leader_required
 def update_prescription(prescription_id):
     prescription = Prescription.query.get_or_404(prescription_id)
     data = request.json
@@ -485,11 +547,60 @@ def update_prescription(prescription_id):
     })
 
 @app.route("/prescriptions/<int:prescription_id>", methods=["DELETE"])
+@leader_required
 def delete_prescription(prescription_id):
     prescription = Prescription.query.get_or_404(prescription_id)
     db.session.delete(prescription)
     db.session.commit()
     return jsonify({"message": "Prescription deleted"}), 200
+
+# ======== CLUSTER / INTER-NODE ENDPOINTS =========
+
+@app.route("/cluster/peers", methods=["GET", "POST"])
+def cluster_peers():
+    if request.method == "GET":
+        return jsonify({"peers": current_app.config.get("PEER_URLS", [])}), 200
+    # POST to register a new peer
+    data = request.json or {}
+    url = data.get("url")
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    peers = register_peer(url)
+    return jsonify({"peers": peers}), 201
+
+@app.route("/cluster/leader", methods=["GET", "POST"])
+def cluster_leader():
+    if request.method == "GET":
+        return jsonify({"leader": current_app.config.get("LEADER_URL")}), 200
+    data = request.json or {}
+    url = data.get("url")
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    leader = set_leader(url)
+    return jsonify({"leader": leader}), 200
+
+@app.route("/cluster/request_patient/<int:patient_id>", methods=["GET"])
+def request_patient_from_peer(patient_id):
+    # this endpoint is used by other nodes to ask this node for patient data (with cluster auth)
+    if not check_cluster_auth():
+        abort(403)
+    patient = Patient.query.get_or_404(patient_id)
+    return jsonify({
+        "patient_id": patient.patient_id,
+        "uuid": patient.uuid,
+        "full_name": encryptor.decrypt(patient.full_name_encrypted),
+        "date_of_birth": encryptor.decrypt(patient.date_of_birth_encrypted),
+        "gender": patient.gender,
+        "phone": encryptor.decrypt(patient.phone_encrypted) if patient.phone_encrypted else None,
+        "address": encryptor.decrypt(patient.address_encrypted) if patient.address_encrypted else None,
+        "created_at": patient.created_at.isoformat()
+    })
+
+@app.route("/cluster/log", methods=["GET"])
+def cluster_log():
+    if not check_cluster_auth():
+        abort(403)
+    return jsonify({"log": get_log()}), 200
 
 # Health check endpoint
 @app.route("/health", methods=["GET"])

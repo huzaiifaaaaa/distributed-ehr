@@ -106,6 +106,40 @@ def test_delete_patient(patient_id):
     print(f"Status: {response.status_code}")
     print(f"Response: {response.json()}")
 
+
+def test_cluster_peers():
+    print("\n=== Testing Cluster Peers ===")
+    # list
+    r = requests.get(f"{BASE_URL}/cluster/peers")
+    print(f"List status: {r.status_code}, {r.json()}")
+    # register sample peer
+    r2 = requests.post(f"{BASE_URL}/cluster/peers", json={"url": "http://localhost:5003"})
+    print(f"Register status: {r2.status_code}, {r2.json()}")
+
+
+def test_cluster_leader():
+    print("\n=== Testing Cluster Leader ===")
+    r = requests.get(f"{BASE_URL}/cluster/leader")
+    print(f"Current leader: {r.status_code}, {r.json()}")
+    r2 = requests.post(f"{BASE_URL}/cluster/leader", json={"url": "{BASE_URL}"})
+    print(f"Set leader result: {r2.status_code}, {r2.json()}")
+
+
+def test_request_patient_via_peer(patient_id):
+    if not patient_id:
+        patient_id = 1
+    print(f"\n=== Testing Request Patient via Peer {patient_id} ===")
+    headers = {"X-Cluster-Auth": "dev-cluster-token"}
+    r = requests.get(f"{BASE_URL}/cluster/request_patient/{patient_id}", headers=headers)
+    print(f"Status: {r.status_code}, {r.json()}")
+
+
+def test_cluster_log():
+    print("\n=== Testing Cluster Log ===")
+    headers = {"X-Cluster-Auth": "dev-cluster-token"}
+    r = requests.get(f"{BASE_URL}/cluster/log", headers=headers)
+    print(f"Log status: {r.status_code}, entries={len(r.json().get('log',[]))}")
+
 if __name__ == "__main__":
     print("=" * 60)
     print("EHR API Test Suite")
@@ -119,12 +153,18 @@ if __name__ == "__main__":
         test_encounters()
         test_observations()
         test_prescriptions()
-        
+
+        # cluster / inter-node tests
+        test_cluster_peers()
+        test_cluster_leader()
+    # assuming node is itself peer for demo
+    test_request_patient_via_peer(1)
+    test_cluster_log()
         # Test CRUD operations
         patient_id = test_create_patient()
         test_update_patient(patient_id)
         test_delete_patient(patient_id)
-        
+
         print("\n" + "=" * 60)
         print("✅ All tests completed!")
         print("=" * 60)
