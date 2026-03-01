@@ -108,17 +108,6 @@ Passwords are never replicated in plain text. The Leader hashes the password usi
 
 ---
 
-## 📂 Project Structure
-
-* `app.py`: Main Flask entry point and API routes.
-* `replication.py`: Contains `@handle_write_request` and `broadcast_replication`.
-* `cluster.py`: The Raft Engine (Heartbeats, Election Timers, State management).
-* `database.py`: SQLAlchemy models with UUID support.
-* `encryption.py`: Utilities for Fernet encryption and hashing.
-* `seed.py`: API-driven script to populate the cluster with initial data.
-
----
-
 
 ## Data Model Diagram
 
