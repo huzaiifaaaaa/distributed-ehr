@@ -1,204 +1,124 @@
 # Distributed EHR System
 
-A Flask-based Electronic Health Records (EHR) system with REST APIs, encryption, and Docker support.
+A highly available, distributed Electronic Health Records (EHR) system. This version implements a custom Raft Consensus Algorithm to ensure data consistency across a multi-node cluster, featuring automated request forwarding and end-to-end encryption.
 
-## Features
+## 🌟 Key Features
 
-- **Complete REST CRUD APIs** for all models (Hospital, User, Patient, Encounter, Observation, Prescription)
-- **Data Encryption**: Patient sensitive data and prescription notes encrypted at rest
-- **Password Hashing**: User credentials securely hashed with Werkzeug
-- **PostgreSQL Database**: Production-ready database with SQLAlchemy ORM
-- **Docker Support**: Full containerization with Docker Compose
-- **Seed Data**: Sample data script for testing
+* **Raft-Based Consensus**: Automated leader election and heartbeat-driven health monitoring.
+* **Write-Anywhere Architecture**: Clients can send write requests to *any* node; Followers automatically proxy requests to the Leader.
+* **Generic Replication Engine**: A single, unified replication receiver handles all models (Hospitals, Patients, Users, Roles, etc.) via UUID-based synchronization.
+* **PII Encryption**: Patient sensitive data (Names, DOB, Phone, Address) and Prescription notes are encrypted at rest using AES-256.
+* **Security**: Inter-node communication is secured via a shared `CLUSTER_AUTH_TOKEN`.
+* **Scalability**: Read requests (`GET`) are served locally by each node to reduce Leader load.
 
-## Architecture
+---
 
-### Data Model
-The system includes 7 main entities with relationships:
-- **Hospital**: Medical facilities
-- **UserRole**: Role definitions (Doctor, Nurse, Admin)
-- **User**: Hospital staff with encrypted passwords
-- **Patient**: Patient records with encrypted PII
-- **Encounter**: Patient visits
-- **Observation**: Medical measurements during encounters
-- **Prescription**: Medications prescribed by doctors
+## 🏗 System Architecture
 
-See the [data model diagram](#data-model-diagram) below.
+### 1. Data Consistency Model
 
-## Quick Start
+The system uses a "Primary-Secondary" replication model governed by Raft:
+
+* **Leader Node**: Manages the cluster state and is the source of truth for all writes.
+* **Follower Nodes**: Maintain local copies of the database and handle read requests.
+* **Forwarding**: If a Follower receives a `POST/PUT/DELETE`, it uses the `handle_write_request` middleware to proxy the request to the Leader's URL.
+
+### 2. Global Identity (UUID)
+
+To prevent ID collisions across distributed databases, every record is assigned a **UUID v4**. While local databases use auto-incrementing integers for internal foreign keys, all inter-node replication and API updates use the UUID as the unique identifier.
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose installed
-- OR Python 3.11+ with PostgreSQL
 
-### Using Docker (Recommended)
+* Docker and Docker Compose
+* Postman (optional, for testing)
 
-1. **Start the application**:
-   ```bash
-   docker-compose up --build
-   ```
+### 1. Start the 3-Node Cluster
 
-2. **Seed the database** (in another terminal):
-   ```bash
-   docker-compose exec app python seed.py
-   ```
+The easiest way to run the system is using the provided Docker Compose file, which spins up three application nodes and three independent PostgreSQL databases.
 
-3. **Cluster example** (run two nodes on different ports):
-   ```bash
-   # node1
-   NODE_URL=http://localhost:5002 LEADER_URL=http://localhost:5002 \
-     PEER_URLS=http://localhost:5003 CLUSTER_AUTH_TOKEN=secret \
-     docker-compose up --build
-
-   # in another shell, node2
-   NODE_URL=http://localhost:5003 PEER_URLS=http://localhost:5002 \
-     CLUSTER_AUTH_TOKEN=secret docker-compose up --build
-   ```
-
-   After both nodes are running you can register peers via `/cluster/peers` or use the environment variable, and manually set the leader or let node1 remain as default.
-
-3. **Access the API**:
-   - Base URL: `http://localhost:5002`
-   - Health check: `http://localhost:5002/health`
-
-### Manual Setup
-
-1. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Configure cluster (optional)**: set `NODE_URL`, `PEER_URLS` (comma-separated), and a shared `CLUSTER_AUTH_TOKEN`. The leader can be designated with `LEADER_URL` or changed at runtime via the API.
-
-
-2. **Set up PostgreSQL** and update `DATABASE_URL` in config.py
-
-3. **Run the application**:
-   ```bash
-   python app.py
-   ```
-
-4. **Seed the database**:
-   ```bash
-   python seed.py
-   ```
-
-## API Endpoints
-
-All endpoints return JSON. Base URL: `http://localhost:5002`
-### Cluster / Inter-node Endpoints
-- `GET /cluster/peers` - list registered peer node URLs
-- `POST /cluster/peers` - register a peer (body `{ "url": "http://other-node:5002" }`)
-- `GET /cluster/leader` - return current leader URL
-- `POST /cluster/leader` - set the leader manually (body `{ "url": "http://node1:5002" }`)
-- `GET /cluster/request_patient/<id>` - used by peers to fetch patient data (requires header `X-Cluster-Auth` with the shared token)
-- `GET /cluster/log` - retrieve the Raft log of operations (requires cluster auth)
-
-Writes to the cluster must go through the leader. Non-leader nodes forward write requests automatically and the leader replicates changes to all peers via the same REST endpoints with a shared authentication token.
-
-These endpoints are useful for basic inter-node communication and demonstrate a simple Raft-style replication strategy: leader election is manual via `/cluster/leader`, and replication is handled by the leader sending each log entry to peers.
-
-### Hospital
-- `POST /hospitals` - Create hospital
-- `GET /hospitals` - List all hospitals
-- `GET /hospitals/<id>` - Get hospital by ID
-- `PUT /hospitals/<id>` - Update hospital
-- `DELETE /hospitals/<id>` - Delete hospital
-
-### User Roles
-- `POST /roles` - Create role
-- `GET /roles` - List all roles
-- `PUT /roles/<id>` - Update role
-
-### Users
-- `POST /users` - Create user
-- `GET /users` - List all users
-- `GET /users/<id>` - Get user by ID
-- `PUT /users/<id>` - Update user
-- `DELETE /users/<id>` - Delete user
-
-### Patients
-- `POST /patients` - Create patient (encrypts sensitive data)
-- `GET /patients` - List all patients (decrypts for display)
-- `GET /patients/<id>` - Get patient by ID
-- `PUT /patients/<id>` - Update patient
-- `DELETE /patients/<id>` - Delete patient
-
-### Encounters
-- `POST /encounters` - Create encounter
-- `GET /encounters` - List all encounters
-- `GET /encounters/<id>` - Get encounter by ID
-- `PUT /encounters/<id>` - Update encounter
-- `DELETE /encounters/<id>` - Delete encounter
-
-### Observations
-- `POST /observations` - Create observation
-- `GET /observations` - List all observations
-- `GET /observations/<id>` - Get observation by ID
-- `PUT /observations/<id>` - Update observation
-- `DELETE /observations/<id>` - Delete observation
-
-### Prescriptions
-- `POST /prescriptions` - Create prescription (encrypts notes)
-- `GET /prescriptions` - List all prescriptions (decrypts notes)
-- `GET /prescriptions/<id>` - Get prescription by ID
-- `PUT /prescriptions/<id>` - Update prescription
-- `DELETE /prescriptions/<id>` - Delete prescription
-
-## API Examples
-
-### Create a Hospital
 ```bash
-curl -X POST http://localhost:5002/hospitals \
-  -H "Content-Type: application/json" \
-  -d '{"name": "General Hospital", "location": "123 Main St"}'
+docker-compose up --build
+
 ```
 
-### Create a Patient (with encryption)
-```bash
-curl -X POST http://localhost:5002/patients \
-  -H "Content-Type: application/json" \
-  -d '{
-    "full_name": "John Doe",
-    "date_of_birth": "1990-01-15",
-    "gender": "Male",
-    "phone": "555-1234",
-    "address": "456 Oak Ave"
-  }'
-```
+| Node | API Port | Internal ID | Role (Initial) |
+| --- | --- | --- | --- |
+| **Node 1** | `5001` | `node1` | Candidate/Leader |
+| **Node 2** | `5002` | `node2` | Follower |
+| **Node 3** | `5003` | `node3` | Follower |
 
-### Get All Users
-```bash
-curl http://localhost:5002/users
-```
-
-
-### Postman Collection
+### 2. Postman Collection
 `https://huzaifa-2937241.postman.co/workspace/distributed-ehr~13c9bc0a-9e39-4b8c-83c4-29342ae61aa7/collection/45457587-e34cdb2e-ca72-4299-a0fd-1f83ae2c242e?action=share&creator=45457587&active-environment=45457587-7116d4eb-5b83-4bf3-b6b7-b484b6fa2db5`
 
-## Security Features
+---
 
-### Encryption
-- **Patient Data**: Full name, date of birth, phone, and address encrypted using Fernet (symmetric encryption)
-- **Prescription Notes**: Encrypted notes for privacy
-- **User Passwords**: Hashed using Werkzeug's pbkdf2:sha256
+## 📡 API Reference
 
-### Environment Variables
-Configure these in production:
-- `SECRET_KEY`: Flask secret key
-- `ENCRYPTION_KEY`: Fernet encryption key (32 bytes)
-- `DATABASE_URL`: PostgreSQL connection string
+### Cluster Management
 
-## Sample Data
+| Endpoint | Method | Description |
+| --- | --- | --- |
+| `/cluster/leader` | `GET` | Returns current node state and leader info. |
+| `/endpoints` | `GET` | Lists all available API routes. |
+| `/health` | `GET` | Simple health check. |
 
-The `seed.py` script creates:
-- 1 Hospital (City General Hospital)
-- 3 User Roles (Doctor, Nurse, Admin)
-- 4 Users (2 doctors, 1 nurse, 1 admin) - password: `password123`
-- 3 Patients (with encrypted PII)
-- 3 Encounters
-- 5 Observations
-- 3 Prescriptions (with encrypted notes)
+### EHR Core APIs
+
+*Note: All write operations automatically forward to the Leader.*
+
+#### 🏥 Hospitals
+
+* `POST /hospitals` - Create hospital (Replicated)
+* `GET /hospitals` - List all hospitals (Local Read)
+* `PUT /hospitals/<id>` - Update hospital (Replicated)
+
+#### 👥 User Roles
+
+* `POST /roles` - Create role (Replicated via Name)
+* `GET /roles` - List roles
+
+#### 👨‍⚕️ Users
+
+* `POST /users` - Create staff user (Hashes password once, replicates hash)
+* `GET /users` - List all users
+
+#### 📋 Patients
+
+* `POST /patients` - Create patient (Encrypts PII, Replicates raw data)
+* `GET /patients` - List patients (Decrypts PII for display)
+* `DELETE /patients/<id>` - Cluster-wide deletion
+
+---
+
+## 🔒 Security Implementation
+
+### Encryption Logic
+
+1. **Leader Action**: Receives raw data $\rightarrow$ Encrypts $\rightarrow$ Saves to DB.
+2. **Replication**: Leader sends raw data to Followers.
+3. **Follower Action**: Receives raw data $\rightarrow$ Encrypts using local `ENCRYPTION_KEY` $\rightarrow$ Saves to DB.
+
+### Password Security
+
+Passwords are never replicated in plain text. The Leader hashes the password using `pbkdf2:sha256`, and this secure hash is what is synchronized to the Follower nodes.
+
+---
+
+## 📂 Project Structure
+
+* `app.py`: Main Flask entry point and API routes.
+* `replication.py`: Contains `@handle_write_request` and `broadcast_replication`.
+* `cluster.py`: The Raft Engine (Heartbeats, Election Timers, State management).
+* `database.py`: SQLAlchemy models with UUID support.
+* `encryption.py`: Utilities for Fernet encryption and hashing.
+* `seed.py`: API-driven script to populate the cluster with initial data.
+
+---
+
 
 ## Data Model Diagram
 
@@ -245,52 +165,3 @@ erDiagram
         timestamp created_at
     }
 ```
-
-## Development
-
-### Stop the application
-```bash
-docker-compose down
-```
-
-### View logs
-```bash
-docker-compose logs -f app
-```
-
-### Access database directly
-```bash
-docker-compose exec db psql -U ehr_user -d ehr_db
-```
-
-### Reset database
-```bash
-docker-compose down -v
-docker-compose up --build
-docker-compose exec app python seed.py
-```
-
-## Project Structure
-
-```
-distributed-ehr/
-└──app
-   ├── app.py              # Main Flask application with API routes
-   ├── database.py         # SQLAlchemy models
-   ├── config.py           # Configuration settings
-   ├── encryption.py       # Encryption utilities
-   ├── seed.py             # Sample data script
-   ├── requirements.txt    # Python dependencies
-   ├── Dockerfile          # Docker container definition
-   └── docker-compose.yml  # Multi-container orchestration
-└──test
-   └── test_api.py         # app test cases
-└──postman
-   └──EHR.postman_collection.json  #app postman collection     
-└── README.md              # Documentation
-```
-
-## Notes
-
-- All sensitive patient data is encrypted at rest
-- User passwords are hashed (not encrypted) for security
