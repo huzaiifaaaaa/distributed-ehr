@@ -1,20 +1,24 @@
 import time, threading, random, requests
-from flask import current_app
 
 class RaftNode:
     def __init__(self):
+        self.node_id = None
+        self.node_url = None
         self.state = "FOLLOWER"
         self.current_term = 0
         self.voted_for = None
         self.log = []
         self.commit_index = 0
-        self.peers = {} # node_id: url
+        self.peers = {} 
         self.heartbeat_timer = None
         self.lock = threading.Lock()
 
-    def init_peers(self, peer_list):
+    def init_node(self, node_id, node_url, peer_list):
+        """Initialize node with config values so it doesn't need Flask context later."""
+        self.node_id = node_id
+        self.node_url = node_url
         for p in peer_list:
-            if p:
+            if p and "=" in p:
                 name, url = p.split("=")
                 self.peers[name] = url
 
@@ -28,15 +32,15 @@ class RaftNode:
         with self.lock:
             self.state = "CANDIDATE"
             self.current_term += 1
-            self.voted_for = current_app.config["NODE_ID"]
-            print(f"Node {self.voted_for} becoming Candidate for Term {self.current_term}")
+            self.voted_for = self.node_id # Use self instead of current_app
+            print(f"Node {self.node_id} becoming Candidate for Term {self.current_term}")
         
-        votes = 1 # Vote for self
+        votes = 1 
         for name, url in self.peers.items():
             try:
                 resp = requests.post(f"{url}/raft/request_vote", json={
                     "term": self.current_term,
-                    "candidate_id": current_app.config["NODE_ID"]
+                    "candidate_id": self.node_id
                 }, timeout=0.1)
                 if resp.json().get("vote_granted"): votes += 1
             except: pass
@@ -49,7 +53,7 @@ class RaftNode:
     def become_leader(self):
         with self.lock:
             self.state = "LEADER"
-            print(f"--- Node {current_app.config['NODE_ID']} ELECTED LEADER ---")
+            print(f"--- Node {self.node_id} ELECTED LEADER ---")
         self.send_heartbeats()
 
     def send_heartbeats(self):
@@ -58,10 +62,11 @@ class RaftNode:
             try:
                 requests.post(f"{url}/raft/append_entries", json={
                     "term": self.current_term,
-                    "leader_id": current_app.config["NODE_ID"],
+                    "leader_id": self.node_id,
                     "commit_index": self.commit_index
                 }, timeout=0.05)
             except: pass
+        # Schedule next heartbeat
         threading.Timer(0.05, self.send_heartbeats).start()
 
 raft = RaftNode()
