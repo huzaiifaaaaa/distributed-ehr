@@ -240,6 +240,95 @@ def get_user(user_id):
         "created_at": user.created_at.isoformat()
     })
 
+# PATIENT
+
+# ========== PATIENT CRUD ==========
+
+@app.route("/patients", methods=["POST"])
+@handle_write_request
+def create_patient():
+    data = request.json
+    new_uuid = str(uuid.uuid4())
+    
+    patient = Patient(
+        uuid=new_uuid,
+        full_name_encrypted=encryptor.encrypt(data["full_name"]),
+        date_of_birth_encrypted=encryptor.encrypt(data["date_of_birth"]),
+        gender=data.get("gender"),
+        phone_encrypted=encryptor.encrypt(data.get("phone")) if data.get("phone") else None,
+        address_encrypted=encryptor.encrypt(data.get("address")) if data.get("address") else None
+    )
+    db.session.add(patient)
+    db.session.commit()
+
+    broadcast_replication("PATIENT", "CREATE", new_uuid, data)
+
+    return jsonify({
+        "patient_id": patient.patient_id,
+        "uuid": patient.uuid,
+        "full_name": data["full_name"],
+        "status": "Created and Replicated"
+    }), 201
+
+@app.route("/patients/<int:patient_id>", methods=["PUT"])
+@handle_write_request
+def update_patient(patient_id):
+    patient = Patient.query.get_or_404(patient_id)
+    data = request.json
+    
+    if "full_name" in data:
+        patient.full_name_encrypted = encryptor.encrypt(data["full_name"])
+    if "date_of_birth" in data:
+        patient.date_of_birth_encrypted = encryptor.encrypt(data["date_of_birth"])
+    patient.gender = data.get("gender", patient.gender)
+    if "phone" in data:
+        patient.phone_encrypted = encryptor.encrypt(data["phone"]) if data["phone"] else None
+    if "address" in data:
+        patient.address_encrypted = encryptor.encrypt(data["address"]) if data["address"] else None
+    
+    db.session.commit()
+    broadcast_replication("PATIENT", "UPDATE", patient.uuid, data)
+    return jsonify({"status": "Updated", "uuid": patient.uuid})
+
+@app.route("/patients/<int:patient_id>", methods=["DELETE"])
+@handle_write_request
+def delete_patient(patient_id):
+    patient = Patient.query.get_or_404(patient_id)
+    target_uuid = patient.uuid
+    
+    db.session.delete(patient)
+    db.session.commit()
+    broadcast_replication("PATIENT", "DELETE", target_uuid, None)
+    return jsonify({"message": "Patient deleted across cluster"}), 200
+
+@app.route("/patients", methods=["GET"])
+def get_patients():
+    patients = Patient.query.all()
+    return jsonify([{
+        "patient_id": p.patient_id,
+        "uuid": p.uuid,
+        "full_name": encryptor.decrypt(p.full_name_encrypted),
+        "date_of_birth": encryptor.decrypt(p.date_of_birth_encrypted),
+        "gender": p.gender,
+        "phone": encryptor.decrypt(p.phone_encrypted) if p.phone_encrypted else None,
+        "address": encryptor.decrypt(p.address_encrypted) if p.address_encrypted else None,
+        "created_at": p.created_at.isoformat()
+    } for p in patients])
+
+@app.route("/patients/<int:patient_id>", methods=["GET"])
+def get_patient(patient_id):
+    patient = Patient.query.get_or_404(patient_id)
+    return jsonify({
+        "patient_id": patient.patient_id,
+        "uuid": patient.uuid,
+        "full_name": encryptor.decrypt(patient.full_name_encrypted),
+        "date_of_birth": encryptor.decrypt(patient.date_of_birth_encrypted),
+        "gender": patient.gender,
+        "phone": encryptor.decrypt(patient.phone_encrypted) if patient.phone_encrypted else None,
+        "address": encryptor.decrypt(patient.address_encrypted) if patient.address_encrypted else None,
+        "created_at": patient.created_at.isoformat()
+    })
+
 # RAFT & REPLICATION ENDPOINTS
 
 @app.route("/raft/replicate_write", methods=["POST"])
@@ -257,11 +346,16 @@ def replicate_write():
                 Patient.query.filter_by(uuid=uid).delete()
             else:
                 p = Patient.query.filter_by(uuid=uid).first() or Patient(uuid=uid)
+                
                 p.full_name_encrypted = encryptor.encrypt(payload.get('full_name'))
+                p.date_of_birth_encrypted = encryptor.encrypt(payload.get('date_of_birth'))
                 p.gender = payload.get('gender')
-                p.date_of_birth_encrypted = encryptor.encrypt(payload.get('dob'))
+                phone = payload.get('phone')
+                p.phone_encrypted = encryptor.encrypt(phone) if phone else None
+                address = payload.get('address')
+                p.address_encrypted = encryptor.encrypt(address) if address else None
+                
                 db.session.add(p)
-
         elif m_type == "HOSPITAL":
             if action == "DELETE":
                 Hospital.query.filter_by(uuid=uid).delete()
