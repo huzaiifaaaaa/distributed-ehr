@@ -11,28 +11,8 @@ app.config.from_object('config.Config')
 db.init_app(app)
 encryptor = Encryptor(app.config["ENCRYPTION_KEY"])
 
-# --- EHR API ENDPOINTS ---
-
-@app.route("/patients", methods=["POST"])
-@handle_write_request
-def create_patient():
-    data = request.json
-    new_uuid = str(uuid.uuid4())
-    
-    # Save locally on Leader
-    new_p = Patient(
-        uuid=new_uuid,
-        full_name_encrypted=encryptor.encrypt(data.get('full_name')),
-        gender=data.get('gender'),
-        date_of_birth_encrypted=encryptor.encrypt(data.get('dob')),
-    )
-    db.session.add(new_p)
-    db.session.commit()
-
-    # Trigger Generic Replication
-    broadcast_replication("PATIENT", "CREATE", new_uuid, data)
-
-    return jsonify({"status": "Created", "uuid": new_uuid}), 201
+# EHR API ENDPOINTS
+# HOSPITAL
 
 @app.route("/hospitals", methods=["POST"])
 @handle_write_request
@@ -40,19 +20,76 @@ def create_hospital():
     data = request.json
     new_uuid = str(uuid.uuid4())
     
-    h = Hospital(uuid=new_uuid, name=data['name'], location=data.get('location'))
-    db.session.add(h)
+    hospital = Hospital(
+        uuid=new_uuid,
+        name=data["name"],
+        location=data.get("location")
+    )
+    db.session.add(hospital)
     db.session.commit()
-
-    # Trigger Generic Replication
     broadcast_replication("HOSPITAL", "CREATE", new_uuid, data)
 
-    return jsonify({"status": "Created", "uuid": new_uuid}), 201
+    return jsonify({
+        "hospital_id": hospital.hospital_id,
+        "uuid": hospital.uuid,
+        "name": hospital.name,
+        "location": hospital.location
+    }), 201
 
-@app.route("/patients", methods=["GET"])
-def get_patients():
-    patients = Patient.query.all()
-    return jsonify([{"uuid": p.uuid, "gender": p.gender} for p in patients])
+@app.route("/hospitals/<int:hospital_id>", methods=["PUT"])
+@handle_write_request
+def update_hospital(hospital_id):
+    hospital = Hospital.query.get_or_404(hospital_id)
+    data = request.json
+    
+    hospital.name = data.get("name", hospital.name)
+    hospital.location = data.get("location", hospital.location)
+    db.session.commit()
+
+    broadcast_replication("HOSPITAL", "UPDATE", hospital.uuid, {
+        "name": hospital.name,
+        "location": hospital.location
+    })
+
+    return jsonify({
+        "hospital_id": hospital.hospital_id,
+        "uuid": hospital.uuid,
+        "name": hospital.name,
+        "location": hospital.location
+    })
+
+@app.route("/hospitals/<int:hospital_id>", methods=["DELETE"])
+@handle_write_request
+def delete_hospital(hospital_id):
+    hospital = Hospital.query.get_or_404(hospital_id)
+    data_uuid = hospital.uuid
+    
+    db.session.delete(hospital)
+    db.session.commit()
+    broadcast_replication("HOSPITAL", "DELETE", data_uuid, None)
+    return jsonify({"message": "Hospital deleted"}), 200
+
+@app.route("/hospitals", methods=["GET"])
+def get_hospitals():
+    hospitals = Hospital.query.all()
+    return jsonify([{
+        "hospital_id": h.hospital_id,
+        "uuid": h.uuid,
+        "name": h.name,
+        "location": h.location,
+        "created_at": h.created_at.isoformat()
+    } for h in hospitals])
+
+@app.route("/hospitals/<int:hospital_id>", methods=["GET"])
+def get_hospital(hospital_id):
+    hospital = Hospital.query.get_or_404(hospital_id)
+    return jsonify({
+        "hospital_id": hospital.hospital_id,
+        "uuid": hospital.uuid,
+        "name": hospital.name,
+        "location": hospital.location,
+        "created_at": hospital.created_at.isoformat()
+    })
 
 # RAFT & REPLICATION ENDPOINTS
 
