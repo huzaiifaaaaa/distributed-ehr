@@ -91,6 +91,60 @@ def get_hospital(hospital_id):
         "created_at": hospital.created_at.isoformat()
     })
 
+# USER ROLE
+
+@app.route("/roles", methods=["POST"])
+@handle_write_request
+def create_role():
+    data = request.json
+    if UserRole.query.filter_by(role_name=data["role_name"]).first():
+        return jsonify({"error": "Role already exists"}), 400
+
+    role = UserRole(
+        role_name=data["role_name"],
+        description=data.get("description")
+    )
+    db.session.add(role)
+    db.session.commit()
+
+    broadcast_replication("ROLE", "CREATE", data["role_name"], data)
+    return jsonify({
+        "role_id": role.role_id,
+        "role_name": role.role_name,
+        "description": role.description
+    }), 201
+
+@app.route("/roles/<int:role_id>", methods=["PUT"])
+@handle_write_request
+def update_role(role_id):
+    role = UserRole.query.get_or_404(role_id)
+    old_name = role.role_name
+    data = request.json
+    
+    role.role_name = data.get("role_name", role.role_name)
+    role.description = data.get("description", role.description)
+    db.session.commit()
+
+    broadcast_replication("ROLE", "UPDATE", old_name, {
+        "role_name": role.role_name,
+        "description": role.description
+    })
+
+    return jsonify({
+        "role_id": role.role_id,
+        "role_name": role.role_name,
+        "description": role.description
+    })
+
+@app.route("/roles", methods=["GET"])
+def get_roles():
+    roles = UserRole.query.all()
+    return jsonify([{
+        "role_id": r.role_id,
+        "role_name": r.role_name,
+        "description": r.description
+    } for r in roles])
+
 # USER
 
 @app.route("/users", methods=["POST"])
@@ -228,6 +282,15 @@ def replicate_write():
                 u.password = payload.get('password')
                 u.role_id = payload.get('role_id')
                 db.session.add(u)
+        
+        elif m_type == "ROLE":
+            role_name = data.get("uuid") 
+            if action == "DELETE":
+                UserRole.query.filter_by(role_name=role_name).delete()
+            else:
+                r = UserRole.query.filter_by(role_name=role_name).first() or UserRole(role_name=role_name)
+                r.description = payload.get('description')
+                db.session.add(r)
 
         db.session.commit()
         return jsonify({"success": True}), 200
