@@ -165,3 +165,25 @@ erDiagram
         timestamp created_at
     }
 ```
+
+## Project Structure
+
+```
+distributed-ehr/
+└──app
+   ├── app.py              # Main Flask application with API routes
+   ├── database.py         # SQLAlchemy models
+   ├── config.py           # Configuration settings
+   ├── encryption.py       # Encryption utilities
+   ├── cluster.py          # Cluster setup
+   ├── replicate.py        # Logic for inter node replication
+   ├── seed.py             # Sample data script
+   ├── requirements.txt    # Python dependencies
+   ├── Dockerfile          # Docker container definition
+   └── docker-compose.yml  # Multi-container orchestration
+└──test
+   └── test_api.py         # app test cases
+└──postman
+   └──EHR.postman_collection.json  #app postman collection     
+└── README.md              # Documentation
+```
