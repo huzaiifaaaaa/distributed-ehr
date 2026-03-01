@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, abort
-from database import db, Patient, Hospital
+from database import db, Patient, Hospital, User, UserRole, Encounter, Observation, Prescription
 from cluster import raft
-from encryption import Encryptor
+from encryption import Encryptor, hash_password
 import uuid
 import requests
 
@@ -10,20 +10,144 @@ app.config.from_object('config.Config')
 db.init_app(app)
 encryptor = Encryptor(app.config["ENCRYPTION_KEY"])
 
+def broadcast_replication(model_type, action, data_uuid, payload):
+    """General helper to broadcast any change to followers."""
+    headers = {"X-Cluster-Auth": app.config.get("CLUSTER_AUTH_TOKEN")}
+    replication_payload = {
+        "type": model_type,   # e.g., "PATIENT", "HOSPITAL"
+        "action": action,     # "CREATE", "UPDATE", "DELETE"
+        "uuid": data_uuid,
+        "data": payload
+    }
+    for name, url in raft.peers.items():
+        if name == app.config.get("NODE_ID"): continue
+        try:
+            requests.post(f"{url}/raft/replicate_write", json=replication_payload, headers=headers, timeout=1.0)
+        except:
+            print(f"Failed to sync {model_type} to {name}")
 
-def leader_required(func):
-    """Ensures write operations only happen on the Leader node."""
+def handle_write_request(endpoint_func):
+    """Middleware: Forwards write requests from Followers to the Leader."""
     def wrapper(*args, **kwargs):
-        if raft.state != "LEADER":
-            return jsonify({
-                "error": "Not the leader", 
-                "hint": f"The current node is a {raft.state}. Send writes to the leader."
-            }), 307 
-        return func(*args, **kwargs)
-    wrapper.__name__ = func.__name__
+        if raft.state == "LEADER":
+            return endpoint_func(*args, **kwargs)
+        
+        leader_id = raft.voted_for
+        leader_url = raft.peers.get(leader_id)
+        if not leader_url:
+            return jsonify({"error": "No leader elected"}), 503
+
+        try:
+            resp = requests.request(
+                method=request.method,
+                url=f"{leader_url.rstrip('/')}{request.path}",
+                json=request.json,
+                headers={k: v for k, v in request.headers if k.lower() != 'host'},
+                timeout=2.0
+            )
+            return (resp.content, resp.status_code, resp.headers.items())
+        except Exception as e:
+            return jsonify({"error": f"Forwarding failed: {str(e)}"}), 500
+    wrapper.__name__ = endpoint_func.__name__
     return wrapper
 
-# --- RAFT INTERNAL ENDPOINTS ---
+# --- REPLICATION RECEIVER (The "Brain") ---
+
+@app.route("/raft/replicate_write", methods=["POST"])
+def replicate_write():
+    """Generic receiver that can handle ANY model type."""
+    data = request.json
+    m_type = data.get("type")
+    action = data.get("action")
+    payload = data.get("data")
+    uid = data.get("uuid")
+
+    try:
+        if m_type == "PATIENT":
+            if action == "DELETE":
+                Patient.query.filter_by(uuid=uid).delete()
+            else:
+                # Create or Update
+                p = Patient.query.filter_by(uuid=uid).first() or Patient(uuid=uid)
+                p.full_name_encrypted = encryptor.encrypt(payload.get('full_name'))
+                p.gender = payload.get('gender')
+                p.date_of_birth_encrypted = encryptor.encrypt(payload.get('dob'))
+                db.session.add(p)
+
+        elif m_type == "HOSPITAL":
+            if action == "DELETE":
+                Hospital.query.filter_by(uuid=uid).delete()
+            else:
+                h = Hospital.query.filter_by(uuid=uid).first() or Hospital(uuid=uid)
+                h.name = payload.get('name')
+                h.location = payload.get('location')
+                db.session.add(h)
+
+        elif m_type == "USER":
+            u = User.query.filter_by(uuid=uid).first() or User(uuid=uid)
+            u.email = payload.get('email')
+            u.password = payload.get('password') # Already hashed by leader
+            u.full_name = payload.get('full_name')
+            u.hospital_id = payload.get('hospital_id')
+            db.session.add(u)
+
+        db.session.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# --- EHR API ENDPOINTS ---
+
+@app.route("/patients", methods=["POST"])
+@handle_write_request
+def create_patient():
+    data = request.json
+    new_uuid = str(uuid.uuid4())
+    
+    # Save locally on Leader
+    new_p = Patient(
+        uuid=new_uuid,
+        full_name_encrypted=encryptor.encrypt(data.get('full_name')),
+        gender=data.get('gender'),
+        date_of_birth_encrypted=encryptor.encrypt(data.get('dob')),
+    )
+    db.session.add(new_p)
+    db.session.commit()
+
+    # Trigger Generic Replication
+    broadcast_replication("PATIENT", "CREATE", new_uuid, data)
+
+    return jsonify({"status": "Created", "uuid": new_uuid}), 201
+
+@app.route("/hospitals", methods=["POST"])
+@handle_write_request
+def create_hospital():
+    data = request.json
+    new_uuid = str(uuid.uuid4())
+    
+    h = Hospital(uuid=new_uuid, name=data['name'], location=data.get('location'))
+    db.session.add(h)
+    db.session.commit()
+
+    # Trigger Generic Replication
+    broadcast_replication("HOSPITAL", "CREATE", new_uuid, data)
+
+    return jsonify({"status": "Created", "uuid": new_uuid}), 201
+
+@app.route("/patients", methods=["GET"])
+def get_patients():
+    patients = Patient.query.all()
+    return jsonify([{"uuid": p.uuid, "gender": p.gender} for p in patients])
+
+
+
+
+
+
+
+
+# RAFT ENDPOINTS
 
 @app.route("/raft/request_vote", methods=["POST"])
 def request_vote():
@@ -33,7 +157,6 @@ def request_vote():
         raft.current_term = term
         raft.voted_for = None
         raft.state = "FOLLOWER"
-    
     granted = False
     if term == raft.current_term and (raft.voted_for is None or raft.voted_for == data.get("candidate_id")):
         raft.voted_for = data.get("candidate_id")
@@ -47,93 +170,26 @@ def append_entries():
     if data.get("term") >= raft.current_term:
         raft.state = "FOLLOWER"
         raft.current_term = data.get("term")
+        raft.voted_for = data.get("leader_id") 
         raft.start_election_timer()
     return jsonify({"success": True})
 
-# --- REPLICATION RECEIVER (For Followers) ---
+# HELPER ENDPOINTS
 
-@app.route("/raft/replicate_write", methods=["POST"])
-def replicate_write():
-    data = request.json
-    try:
-        if data['type'] == "PATIENT":
-            p_data = data['data']
-            # Re-encrypt locally to ensure consistency
-            new_p = Patient(
-                uuid=data['uuid'],
-                full_name_encrypted=encryptor.encrypt(p_data.get('full_name')),
-                gender=p_data.get('gender'),
-                date_of_birth_encrypted=encryptor.encrypt(p_data.get('dob'))
-            )
-            db.session.add(new_p)
-            db.session.commit()
-            print(f"Follower successfully replicated patient: {data['uuid']}")
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        print(f"Replication error on follower: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-# --- EHR API ENDPOINTS ---
-
-@app.route("/patients", methods=["POST"])
-@leader_required
-def create_patient():
-    data = request.json
-    patient_uuid = str(uuid.uuid4())
-    
-    # 1. Save to Leader's local DB
-    new_p = Patient(
-        uuid=patient_uuid,
-        full_name_encrypted=encryptor.encrypt(data.get('full_name')),
-        gender=data.get('gender'),
-        date_of_birth_encrypted=encryptor.encrypt(data.get('dob')),
-    )
-    db.session.add(new_p)
-    db.session.commit()
-
-    # 2. REPLICATION: Tell all followers to do the same
-    # Ensure CLUSTER_AUTH_TOKEN matches your config
-    headers = {"X-Cluster-Auth": app.config.get("CLUSTER_AUTH_TOKEN")}
-    
-    for name, url in raft.peers.items():
-        # Don't replicate to yourself
-        if name == app.config.get("NODE_ID"):
-            continue
-            
-        try:
-            print(f"Attempting to replicate to {name} at {url}...")
-            requests.post(
-                f"{url}/raft/replicate_write", 
-                json={"type": "PATIENT", "data": data, "uuid": patient_uuid},
-                headers=headers,
-                timeout=1.0 # Give it a bit more time
-            )
-        except Exception as e:
-            print(f"Replication failed for {name}: {e}")
-
-    return jsonify({"status": "Patient created and replication triggered", "uuid": patient_uuid}), 201
-
-@app.route("/patients", methods=["GET"])
-def get_patients():
-    patients = Patient.query.all()
-    output = []
-    for p in patients:
-        output.append({
-            "uuid": p.uuid,
-            "name": encryptor.decrypt(p.full_name_encrypted),
-            "gender": p.gender,
-            "dob": encryptor.decrypt(p.date_of_birth_encrypted)
+@app.route("/endpoints", methods=["GET"])
+def list_endpoints():
+    endpoints = []
+    for rule in app.url_map.iter_rules():
+        endpoints.append({
+            "endpoint": rule.endpoint,
+            "methods": list(rule.methods),
+            "path": str(rule)
         })
-    return jsonify(output)
+    return jsonify(endpoints), 200
 
-@app.route("/cluster/leader", methods=["GET"])
-def get_leader_info():
-    return jsonify({
-        "node_id": raft.node_id,
-        "state": raft.state,
-        "current_term": raft.current_term,
-        "peers_configured": list(raft.peers.keys())
-    })
+@app.route("/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
     with app.app_context():
