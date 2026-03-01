@@ -91,6 +91,101 @@ def get_hospital(hospital_id):
         "created_at": hospital.created_at.isoformat()
     })
 
+# USER
+
+@app.route("/users", methods=["POST"])
+@handle_write_request
+def create_user():
+    data = request.json
+    new_uuid = str(uuid.uuid4())
+    hashed_pw = hash_password(data["password"])
+    
+    user = User(
+        uuid=new_uuid,
+        hospital_id=data["hospital_id"],
+        full_name=data["full_name"],
+        email=data["email"],
+        password=hashed_pw,
+        role_id=data["role_id"]
+    )
+    db.session.add(user)
+    db.session.commit()
+
+    repl_payload = data.copy()
+    repl_payload['password'] = hashed_pw 
+    broadcast_replication("USER", "CREATE", new_uuid, repl_payload)
+
+    return jsonify({
+        "user_id": user.user_id,
+        "uuid": user.uuid,
+        "full_name": user.full_name,
+        "email": user.email
+    }), 201
+
+@app.route("/users/<int:user_id>", methods=["PUT"])
+@handle_write_request
+def update_user(user_id):
+    user = User.query.get_or_404(user_id)
+    data = request.json
+    
+    user.full_name = data.get("full_name", user.full_name)
+    user.email = data.get("email", user.email)
+    
+    current_pw = user.password
+    if "password" in data:
+        current_pw = hash_password(data["password"])
+        user.password = current_pw
+        
+    user.role_id = data.get("role_id", user.role_id)
+    db.session.commit()
+
+    broadcast_replication("USER", "UPDATE", user.uuid, {
+        "hospital_id": user.hospital_id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "password": current_pw,
+        "role_id": user.role_id
+    })
+    return jsonify({"status": "User updated", "uuid": user.uuid})
+
+@app.route("/users/<int:user_id>", methods=["DELETE"])
+@handle_write_request
+def delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    data_uuid = user.uuid
+    
+    db.session.delete(user)
+    db.session.commit()
+
+    broadcast_replication("USER", "DELETE", data_uuid, None)
+    return jsonify({"message": "User deleted"}), 200
+
+@app.route("/users", methods=["GET"])
+def get_users():
+    users = User.query.all()
+    return jsonify([{
+        "user_id": u.user_id,
+        "uuid": u.uuid,
+        "full_name": u.full_name,
+        "email": u.email,
+        "hospital_id": u.hospital_id,
+        "role_id": u.role_id,
+        "created_at": u.created_at.isoformat()
+    } for u in users])
+
+@app.route("/users/<int:user_id>", methods=["GET"])
+def get_user(user_id):
+    user = User.query.get_or_404(user_id)
+    return jsonify({
+        "user_id": user.user_id,
+        "uuid": user.uuid,
+        "full_name": user.full_name,
+        "email": user.email,
+        "hospital_id": user.hospital_id,
+        "role_id": user.role_id,
+        "created_at": user.created_at.isoformat()
+    })
+
 # RAFT & REPLICATION ENDPOINTS
 
 @app.route("/raft/replicate_write", methods=["POST"])
@@ -107,7 +202,6 @@ def replicate_write():
             if action == "DELETE":
                 Patient.query.filter_by(uuid=uid).delete()
             else:
-                # Create or Update
                 p = Patient.query.filter_by(uuid=uid).first() or Patient(uuid=uid)
                 p.full_name_encrypted = encryptor.encrypt(payload.get('full_name'))
                 p.gender = payload.get('gender')
@@ -124,12 +218,16 @@ def replicate_write():
                 db.session.add(h)
 
         elif m_type == "USER":
-            u = User.query.filter_by(uuid=uid).first() or User(uuid=uid)
-            u.email = payload.get('email')
-            u.password = payload.get('password') # Already hashed by leader
-            u.full_name = payload.get('full_name')
-            u.hospital_id = payload.get('hospital_id')
-            db.session.add(u)
+            if action == "DELETE":
+                User.query.filter_by(uuid=uid).delete()
+            else:
+                u = User.query.filter_by(uuid=uid).first() or User(uuid=uid)
+                u.hospital_id = payload.get('hospital_id')
+                u.full_name = payload.get('full_name')
+                u.email = payload.get('email')
+                u.password = payload.get('password')
+                u.role_id = payload.get('role_id')
+                db.session.add(u)
 
         db.session.commit()
         return jsonify({"success": True}), 200
