@@ -1,68 +1,67 @@
-from flask import current_app, request, jsonify
-import requests
+import time, threading, random, requests
+from flask import current_app
 
-# Simple cluster manager to handle peers, leader status, and log replication
+class RaftNode:
+    def __init__(self):
+        self.state = "FOLLOWER"
+        self.current_term = 0
+        self.voted_for = None
+        self.log = []
+        self.commit_index = 0
+        self.peers = {} # node_id: url
+        self.heartbeat_timer = None
+        self.lock = threading.Lock()
 
-def get_peers():
-    return current_app.config.get("PEER_URLS", [])
+    def init_peers(self, peer_list):
+        for p in peer_list:
+            if p:
+                name, url = p.split("=")
+                self.peers[name] = url
 
+    def start_election_timer(self):
+        if self.heartbeat_timer: self.heartbeat_timer.cancel()
+        timeout = random.uniform(0.15, 0.3)
+        self.heartbeat_timer = threading.Timer(timeout, self.become_candidate)
+        self.heartbeat_timer.start()
 
-def append_log(entry):
-    """Append a log entry to the local Raft log (stored in config)."""
-    log = current_app.config.setdefault("RAFT_LOG", [])
-    log.append(entry)
-    current_app.config["RAFT_LOG"] = log
-    return log
+    def become_candidate(self):
+        with self.lock:
+            self.state = "CANDIDATE"
+            self.current_term += 1
+            self.voted_for = current_app.config["NODE_ID"]
+            print(f"Node {self.voted_for} becoming Candidate for Term {self.current_term}")
+        
+        votes = 1 # Vote for self
+        for name, url in self.peers.items():
+            try:
+                resp = requests.post(f"{url}/raft/request_vote", json={
+                    "term": self.current_term,
+                    "candidate_id": current_app.config["NODE_ID"]
+                }, timeout=0.1)
+                if resp.json().get("vote_granted"): votes += 1
+            except: pass
+        
+        if votes > (len(self.peers) + 1) / 2:
+            self.become_leader()
+        else:
+            self.start_election_timer()
 
+    def become_leader(self):
+        with self.lock:
+            self.state = "LEADER"
+            print(f"--- Node {current_app.config['NODE_ID']} ELECTED LEADER ---")
+        self.send_heartbeats()
 
-def get_log():
-    return current_app.config.get("RAFT_LOG", [])
+    def send_heartbeats(self):
+        if self.state != "LEADER": return
+        for name, url in self.peers.items():
+            try:
+                requests.post(f"{url}/raft/append_entries", json={
+                    "term": self.current_term,
+                    "leader_id": current_app.config["NODE_ID"],
+                    "commit_index": self.commit_index
+                }, timeout=0.05)
+            except: pass
+        threading.Timer(0.05, self.send_heartbeats).start()
 
-
-def is_leader():
-    return current_app.config.get("NODE_URL") == current_app.config.get("LEADER_URL")
-
-
-def forward_to_leader(path, method="GET", json=None):
-    leader = current_app.config.get("LEADER_URL")
-    if not leader:
-        return None
-    url = leader.rstrip("/") + path
-    headers = {"X-Cluster-Auth": current_app.config.get("CLUSTER_AUTH_TOKEN")}
-    resp = requests.request(method, url, json=json, headers=headers)
-    return resp
-
-
-def replicate_to_peers(path, method="POST", json=None):
-    peers = get_peers()
-    results = []
-    headers = {"X-Cluster-Auth": current_app.config.get("CLUSTER_AUTH_TOKEN")}
-    for peer in peers:
-        try:
-            url = peer.rstrip("/") + path
-            r = requests.request(method, url, json=json, headers=headers, timeout=5)
-            results.append((peer, r.status_code))
-        except Exception as e:
-            results.append((peer, str(e)))
-    return results
-
-
-def check_cluster_auth():
-    token = request.headers.get("X-Cluster-Auth")
-    if token != current_app.config.get("CLUSTER_AUTH_TOKEN"):
-        return False
-    return True
-
-# endpoint handlers
-
-def register_peer(url):
-    peers = get_peers()
-    if url not in peers and url != current_app.config.get("NODE_URL"):
-        peers.append(url)
-        current_app.config["PEER_URLS"] = peers
-    return peers
-
-
-def set_leader(url):
-    current_app.config["LEADER_URL"] = url
-    return url
+raft = RaftNode()

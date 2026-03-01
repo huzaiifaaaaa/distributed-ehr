@@ -135,7 +135,7 @@ class Prescription(db.Model):
     medication = db.Column(db.String(255), nullable=False)
 
     # ERD says "doage" (typo). Use "dosage" in code, but map to "doage" if you want exact DB column name.
-    dosage = db.Column("doage", db.Column(db.String(100)).type, nullable=True)
+    dosage = db.Column("dosage", db.Column(db.String(100)).type, nullable=True)
 
     frequency = db.Column(db.String(100), nullable=True)
     duration = db.Column(db.String(100), nullable=True)
@@ -146,3 +146,10 @@ class Prescription(db.Model):
     encounter = db.relationship("Encounter", back_populates="prescriptions")
     patient = db.relationship("Patient", back_populates="prescriptions")
     doctor = db.relationship("User", back_populates="doctor_prescriptions", foreign_keys=[doctor_id])
+
+class RaftLog(db.Model):
+    __tablename__ = "raft_log"
+    id = db.Column(db.Integer, primary_key=True)
+    term = db.Column(db.Integer, nullable=False)
+    index = db.Column(db.Integer, nullable=False)
+    command = db.Column(db.JSON, nullable=False)
